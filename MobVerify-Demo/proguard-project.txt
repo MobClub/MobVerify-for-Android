@@ -1,0 +1,9 @@
+# for MobVerify/MobVerifyGUI/SMSSDK
+-keep class com.mob.**{*;}
+-keep class cn.smssdk.**{*;}
+# for CTCC
+-keep class cn.com.chinatelecom.gateway.lib.** { *; }
+# for CUCC
+-keep class com.unicom.xiaowo.verify.** { *; }
+# for CMCC
+-keep class com.cmic.sso.sdk.** { *; }

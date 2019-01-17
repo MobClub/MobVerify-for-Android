@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="app_name">MobVerifyDemo</string>
+	<string name="mob_verify_demo_login_or_register">本机号码登录/注册</string>
+	<string name="mob_verify_demo_reverify">重要操作二次验证</string>
+	<string name="mob_verify_demo_hint">无需验证码，快速验证</string>
+</resources>

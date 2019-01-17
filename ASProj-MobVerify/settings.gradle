@@ -1,0 +1,4 @@
+//Demo
+include ':MobVerify-Demo'
+project(':MobVerify-Demo').projectDir = new File('../MobVerify-Demo')
+

@@ -1,0 +1,15 @@
+
+ASProj-MobVerify/.gradle/
+ASProj-MobVerify/.idea/
+ASProj-MobVerify/build/
+ASProj-MobVerify/gradle/
+ASProj-MobVerify/ASProj-MobVerify.iml
+ASProj-MobVerify/local.properties
+ASProj-MobVerify/gradle.properties
+ASProj-MobVerify/gradlew.bat
+ASProj-MobVerify/gradlew
+
+MobVerify-Demo/build/
+MobVerify-Demo/MobVerify-Demo.iml
+
+

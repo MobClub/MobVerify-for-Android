@@ -1,0 +1,383 @@
+/**
+ * 此文件用于迁移自eclipse而来的项目，使用方法如下：
+ * 1、在trunk下创建一个目录，比如叫做as-project
+ * 2、复制gradlew、gradlew.bat、build.gradle、settings.gradle和gradle.properties这些默认必要的文件到as-project中
+ * 3、复制本文件到as-project中
+ * 4、进入原来的eclipse目录，比如叫做EclipseProject，并假定其位于trunk下
+ * 5、在其中创建一个build.gradle的文件，若EclipseProject为库项目，则在文件中添加如下内容：
+ * <code>
+ *     apply plugin: 'com.android.library'
+ *     apply from: '../as-project/EclipseModule.gradle'
+ * </code>
+ * 否则，在文件中添加如下内容：
+ * <code>
+ *     apply plugin: 'com.android.application'
+ *     apply from: '../as-project/EclipseModule.gradle'
+ * </code>
+ * 6、打开as-project中的settings.gradle，在其中添加对EclipseProject的引用，如：
+ * <code>
+ *     include ':EclipseProject'
+ *     project(':EclipseProject').projectDir = new File('../EclipseProject')
+ * </code>
+ * 7、如果EclipseProject依赖于其它项目，可以在其中添加dependencies块，并加入依赖；android块同理
+ * 8、此脚本会尝试寻找pcp，可以在as-project的build.gradle中添加如下代码启动或关闭pcp功能：
+ * <code>
+ *     ext {
+ *         enablePCP = false
+ *     }
+ * </code>
+ * 但在release时会pcp强制开启，除非此脚本无法找到pcp.jar
+ */
+
+buildscript {
+	dependencies {
+		// 寻找pcp
+		// 默认会现在主模块中寻找
+		// 找不到了会到trunk中寻找“autobuild”，或“auto-build”名字的目录，然后在这个目录中寻找
+		// 如果还是找不到，会到trunk父目录中再找多一次“autobuild”，或“auto-build”名字的目录，然后在这个目录中寻找
+		// 如果都找不到，则认定pcp不可用
+		def pcpFile = new File(rootProject.projectDir, "pcp.jar")
+		if (pcpFile.exists()) {
+			classpath files(pcpFile.absolutePath)
+		} else {
+			def found = false
+			def trunk = rootProject.projectDir.parentFile
+			if (trunk != null && !"trunk".equals(trunk.name)) {
+				trunk.list().each {
+					def lowName = it.toLowerCase()
+					if ("autobuild".equals(lowName) || "auto-build".equals(lowName)) {
+						def autoBuildFolder = new File(trunk, it)
+						pcpFile = new File(autoBuildFolder, "pcp.jar")
+						if (pcpFile.exists()) {
+							classpath files(pcpFile.absolutePath)
+							found = true
+							return
+						}
+					}
+				}
+			}
+
+			if (!found) {
+				def svnProj = trunk.parentFile
+				svnProj.list().each {
+					def lowName = it.toLowerCase()
+					if ("autobuild".equals(lowName) || "auto-build".equals(lowName)) {
+						def autoBuildFolder = new File(svnProj, it)
+						pcpFile = new File(autoBuildFolder, "pcp.jar")
+						if (pcpFile.exists()) {
+							classpath files(pcpFile.absolutePath)
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// ================================
+
+/** 项目级别的编译参数 */
+class GlobalVariables {
+    public static def refreshTime = 0l
+    public static def buildTools
+    public static def compileSdkVersion
+    public static def proguardFile
+    public static def targetSdkVersion
+    public static def minSdkVersion
+    public static def applicationId
+    public static def versionCode
+    public static def versionName
+	public static def pcpAvailable
+	public static def pcpConfig
+}
+
+/** 初始化编译参数  */
+def init() {
+    def time = System.currentTimeMillis()
+    if (time - GlobalVariables.refreshTime < 1000l) {
+        GlobalVariables.refreshTime = time
+        return
+    }
+
+    // 从local.properties中读取android-sdk所在目录和并确定最新版本的build tools
+    def localProperties = new File(rootProject.projectDir, "local.properties")
+    def sdkDir
+    if (localProperties.exists()) {
+        def properties = new Properties()
+        localProperties.withInputStream {
+            instr->properties.load(instr)
+        }
+        sdkDir = properties.getProperty('sdk.dir')
+    }
+    // 从系统环境变量中读取sdk路径
+    if (sdkDir == null) {
+        sdkDir = System.env.ANDROID_HOME
+    }
+    println "sdkDir=" + sdkDir
+    def buildTools = new File(sdkDir, "build-tools")
+    if (buildTools.exists()) {
+        def tools = buildTools.list()
+        if (tools != null) {
+            Arrays.sort(tools)
+            GlobalVariables.buildTools = tools[tools.length - 1]
+        }
+    }
+    if (GlobalVariables.buildTools == null) {
+        throw RuntimeException("Faile to find build tools")
+    }
+
+	// 寻找第一个application模块所在路径
+	// 在大多数情况下，这个模块就是我们准备编译的模块
+    def firstProjectPath = projectDir.getAbsolutePath()
+	rootProject.getSubprojects().each { proj ->
+		def gradleFile = new File(proj.projectDir, "build.gradle")
+		def fis = new FileInputStream(gradleFile)
+		def InputStreamReader isr = new InputStreamReader(fis, "utf-8")
+		def br = new BufferedReader(isr)
+		def line = br.readLine()
+		while (line != null) {
+			line = line.trim()
+			if (line.startsWith("apply") && line.endsWith("'com.android.application'")) {
+				line = line.substring(5, line.length() - 25).trim()
+				if (line.startsWith("plugin") && line.endsWith(":")) {
+					br.close()
+					firstProjectPath = proj.projectDir.getAbsolutePath()
+					return
+				}
+			}
+			line = br.readLine()
+		}
+		br.close()
+	}
+
+	// 解析application模块中的project.properties，确定编译时采用的SDK level
+	// 默认采用level 19
+    GlobalVariables.compileSdkVersion = 19
+    def projProp = new File(firstProjectPath, "project.properties")
+    if (projProp.exists()) {
+        def properties = new Properties()
+        projProp.withInputStream {
+            instr->properties.load(instr)
+        }
+        def target = properties.getProperty('target').trim()
+        def pref = "android-"
+        if (target != null && target.startsWith(pref)) {
+            try {
+                GlobalVariables.compileSdkVersion = Integer.parseInt(target.substring(pref.length()))
+            } catch (Throwable t) {}
+        }
+    }
+
+	// 确定混淆脚本的路径
+    def file = new File(firstProjectPath, "proguard-project.txt")
+    GlobalVariables.proguardFile = (file).getAbsolutePath()
+
+	// 解析application模块的AndroidManifest文件，defaultConfig的参数将从这里复制出去
+    file = new File(firstProjectPath, "AndroidManifest.xml")
+    def xml = new XmlSlurper()
+    def firstManifest = xml.parse(file)
+    try {
+        def tmpValue = firstManifest.getAt("uses-sdk").getProperty('@android:targetSdkVersion').toString()
+        GlobalVariables.targetSdkVersion = Integer.parseInt(tmpValue)
+    } catch (Throwable t) {
+        GlobalVariables.targetSdkVersion = GlobalVariables.compileSdkVersion
+    }
+    try {
+        def tmpValue = firstManifest.getAt("uses-sdk").getProperty('@android:minSdkVersion').toString()
+        GlobalVariables.minSdkVersion = Integer.parseInt(tmpValue)
+    } catch (Throwable t) {
+        GlobalVariables.minSdkVersion = GlobalVariables.targetSdkVersion
+    }
+    GlobalVariables.applicationId = firstManifest.getProperty('@package').toString()
+    try {
+        def tmpValue = firstManifest.getProperty('@android:versionCode').toString()
+        GlobalVariables.versionCode = Integer.parseInt(tmpValue)
+    } catch (Throwable t) {
+        GlobalVariables.versionCode = 1
+    }
+    try {
+        GlobalVariables.versionName = firstManifest.getProperty('@android:versionName').toString()
+    } catch (Throwable t) {
+        GlobalVariables.versionName = "1.0"
+    }
+
+	// 检查PCP
+	// pcp主要由主模块的ext.enablePCP标志控制，但如果编译类型是release，则pcp会强制启动，除非找不到pcp
+	def enablePCP = false;
+	try {
+		enablePCP = rootProject.ext.enablePCP
+	} catch (Throwable t) {}
+	def pcpForceEnable = gradle.startParameter.taskNames.any {
+		if (it.contains(":assembleRelease")) {
+			return true
+		}
+	}
+	GlobalVariables.pcpAvailable = false
+	if (enablePCP || pcpForceEnable) {
+		try {
+			if (Class.forName("m.pcp.PCP") != null) {
+				GlobalVariables.pcpAvailable = true
+			}
+		} catch(Throwable t) {}
+	}
+
+	// 读取pcp.prop
+	GlobalVariables.pcpConfig = new HashMap()
+	if (GlobalVariables.pcpAvailable) {
+		def pcpJar = null
+		buildscript.configurations.classpath.each { dep->
+			if ("pcp.jar".equals(dep.getName())) {
+				pcpJar = dep
+			}
+		}
+		if (pcpJar != null) {
+			def pcpProp = new File(pcpJar.parentFile, "pcp.prop")
+			if (pcpProp.exists()) {
+				def fis = new FileInputStream(pcpProp)
+				def isr = new InputStreamReader(fis)
+				def br = new BufferedReader(isr)
+				def line = br.readLine()
+				while (line != null) {
+					def i = line.indexOf("=")
+					if (i > 0) {
+						def key = line.substring(0, i).trim()
+						def value = line.substring(i + 1).trim()
+						GlobalVariables.pcpConfig.put(key, value)
+					}
+					line = br.readLine()
+				}
+			}
+		}
+	}
+
+	// 刷新编译参数的更新时间，并将其打印出来
+    GlobalVariables.refreshTime = time
+    println("================================")
+	println("initBy           : " + project.name)
+    println("buildTools       : " + GlobalVariables.buildTools)
+    println("compileSdkVersion: " + GlobalVariables.compileSdkVersion)
+    println("proguardFile     : " + GlobalVariables.proguardFile)
+    println("targetSdkVersion : " + GlobalVariables.targetSdkVersion)
+    println("minSdkVersion    : " + GlobalVariables.minSdkVersion)
+    println("applicationId    : " + GlobalVariables.applicationId)
+    println("versionCode      : " + GlobalVariables.versionCode)
+    println("versionName      : " + GlobalVariables.versionName)
+	println("pcpAvailable     : " + GlobalVariables.pcpAvailable)
+	println("pcp.prop         : " + GlobalVariables.pcpConfig)
+    println("================================")
+}
+
+/** 解析指定模块的project.properties文件，确定其是否为一个库项目 */
+def isLibrary(def projDir) {
+    def projProp = new File(projDir, "project.properties")
+    def res = false
+    if (projProp.exists()) {
+        def properties = new Properties()
+        projProp.withInputStream {
+            instr->properties.load(instr)
+        }
+        def target = properties.getProperty('android.library')
+        res = "true".equals(target)
+    }
+    return res
+}
+
+/** 启动PCP */
+def doPCP() {
+	if (GlobalVariables.pcpAvailable) {
+		def pcp = null
+		try {
+			def PCP = Class.forName("m.pcp.PCP")
+			pcp = PCP.newInstance()
+		} catch (Throwable t) {}
+
+		if (pcp != null) {
+			def args = new String[3 + GlobalVariables.pcpConfig.size() * 2]
+			args[0] = projectDir.absolutePath
+			args[1] = "src"
+			args[2] = "pcp"
+			int i = 3
+			GlobalVariables.pcpConfig.each { key, value->
+				args[i] = key
+				args[i + 1] = value
+				i += 2
+			}
+			pcp.start(args)
+
+			def pcpFolder = new File(projectDir, "pcp")
+			def srcFolder = new File(projectDir, "src")
+			def tmp = new File(projectDir, "src.bu")
+			srcFolder.renameTo(tmp)
+			tmp = pcpFolder
+			pcpFolder.renameTo(srcFolder)
+			tmp.delete()
+			tmp = new File(srcFolder, ".define")
+			tmp.delete()
+		}
+	}
+}
+
+/** 还原src目录 */
+gradle.buildFinished {
+	if (GlobalVariables.pcpAvailable) {
+		def srcFolder = new File(projectDir, "src")
+		def pcpFolder = new File(projectDir, "pcp")
+		def bu = new File(projectDir, "src.bu")
+		srcFolder.renameTo(pcpFolder)
+		bu.renameTo(srcFolder)
+	}
+}
+
+// ================================
+
+android {
+    init()
+
+    compileSdkVersion GlobalVariables.compileSdkVersion
+    buildToolsVersion GlobalVariables.buildTools
+
+    defaultConfig {
+        if (!isLibrary(projectDir)) {
+            applicationId GlobalVariables.applicationId
+        }
+        minSdkVersion GlobalVariables.minSdkVersion
+        targetSdkVersion GlobalVariables.targetSdkVersion
+        versionCode GlobalVariables.versionCode
+        versionName GlobalVariables.versionName
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            assets.srcDirs = ['assets']
+            java.srcDirs = ['src']
+            aidl.srcDirs = ['src']
+            res.srcDirs = ['res']
+            jniLibs.srcDirs = ['libs']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled !isLibrary(projectDir)
+            proguardFiles GlobalVariables.proguardFile
+        }
+    }
+
+    lintOptions {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_6
+        targetCompatibility JavaVersion.VERSION_1_6
+    }
+
+	doPCP()
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
+}
