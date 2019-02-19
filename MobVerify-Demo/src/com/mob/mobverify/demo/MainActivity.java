@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -37,6 +38,13 @@ public class MainActivity extends Activity implements View.OnClickListener {
 
 		initView();
 		checkPermissions();
+	}
+
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		// 页面销毁时需要注销Callback，防止内存泄漏
+		MobVerifyGui.unRegisterCallback();
 	}
 
 	@Override
@@ -71,11 +79,15 @@ public class MainActivity extends Activity implements View.OnClickListener {
 						String errMsg = e.getMessage();
 						// 更详细的网络错误信息可以通过t查看，请注意：t有可能为null
 						Throwable t = e.getCause();
+						String errDetail = null;
 						if (t != null) {
-							String errDetail = t.getMessage();
+							errDetail = t.getMessage();
 						}
 
 						String msg = "errCode: " + errCode + "\nerrMsg: " + errMsg;
+						if (!TextUtils.isEmpty(errDetail)) {
+							msg += "\nerrDetail: " + errDetail;
+						}
 						Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
 					}
 				});
@@ -109,11 +121,15 @@ public class MainActivity extends Activity implements View.OnClickListener {
 						String errMsg = e.getMessage();
 						// 更详细的网络错误信息可以通过t查看，请注意：t有可能为null
 						Throwable t = e.getCause();
+						String errDetail = null;
 						if (t != null) {
-							String errDetail = t.getMessage();
+							errDetail = t.getMessage();
 						}
 
 						String msg = "errCode: " + errCode + "\nerrMsg: " + errMsg;
+						if (!TextUtils.isEmpty(errDetail)) {
+							msg += "\nerrDetail: " + errDetail;
+						}
 						Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
 					}
 				});
