@@ -1,3 +1,4 @@
+-ignorewarnings
 # for MobVerify/MobVerifyGUI/SMSSDK
 -keep class com.mob.**{*;}
 -keep class cn.smssdk.**{*;}
