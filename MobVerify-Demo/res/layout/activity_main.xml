@@ -10,43 +10,47 @@
 	android:gravity="center_horizontal"
 	android:background="@color/mob_verify_demo_common_bg"
 	android:orientation="vertical">
+	<View
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="0.2"/>
 	<ImageView
 		android:id="@+id/mob_verify_demo_main_logo"
 		android:layout_width="80dp"
 		android:layout_height="80dp"
-		android:scaleType="centerCrop"
-		android:layout_marginTop="60dp"/>
+		android:scaleType="centerCrop"/>
 	<TextView
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
 		android:layout_marginTop="20dp"
-		android:textSize="@dimen/mob_verify_demo_text_size_s"
+		android:textSize="@dimen/mob_verify_demo_text_size_m"
 		android:textColor="@color/mob_verify_demo_text_color_common_black"
 		android:text="@string/mob_verify_demo_hint"/>
 	<LinearLayout
 		android:layout_width="match_parent"
 		android:layout_height="0dp"
-		android:layout_weight="1"
-		android:gravity="bottom">
+		android:layout_weight="0.3"
+		android:gravity="bottom"
+		android:orientation="vertical">
 		<com.mob.mobverify.gui.view.component.VerifyCommonButton
-			android:id="@+id/mob_verify_demo_main_login"
+			android:id="@+id/mob_verify_demo_main_one_key_login"
 			android:layout_width="match_parent"
 			android:layout_height="@dimen/mob_verify_demo_common_btn_height"
+			app:vcombtn_text="@string/mob_verify_demo_one_key_login"/>
+		<com.mob.mobverify.gui.view.component.VerifyCommonButton
+			android:id="@+id/mob_verify_demo_main_verify"
+			android:layout_width="match_parent"
+			android:layout_height="@dimen/mob_verify_demo_common_btn_height"
+			android:layout_marginTop="30dp"
 			app:vcombtn_textColor="#EEEEEE"
 			app:vcombtn_textSize="14"
-			app:vcombtn_text="@string/mob_verify_demo_login_or_register"/>
+			app:vcombtn_text="@string/mob_verify_demo_verify"/>
 	</LinearLayout>
-	<com.mob.mobverify.gui.view.component.VerifyCommonButton
-		android:id="@+id/mob_verify_demo_main_reverify"
-		android:layout_width="match_parent"
-		android:layout_height="@dimen/mob_verify_demo_common_btn_height"
-		android:layout_marginTop="40dp"
-		app:vcombtn_text="@string/mob_verify_demo_reverify"/>
 	<TextView
 		android:id="@+id/mob_verify_demo_main_version"
 		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
-		android:layout_marginTop="60dp"
+		android:layout_marginTop="80dp"
 		android:textSize="@dimen/mob_verify_demo_text_size_s"
 		android:textColor="@color/mob_verify_demo_text_color_common_gray"
 		tools:text="版本号"/>

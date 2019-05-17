@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+	<string name="mob_verify_demo_text_title_bar_back"><![CDATA[<]]></string>
+
 	<string name="app_name">Mob云验证</string>
-	<string name="mob_verify_demo_login_or_register">本机号码登录/注册</string>
-	<string name="mob_verify_demo_reverify">重要操作二次验证</string>
-	<string name="mob_verify_demo_hint">无需验证码，快速验证</string>
+	<string name="mob_verify_demo_verify">本手机号验证</string>
+	<string name="mob_verify_demo_one_key_login">一键登录</string>
+	<string name="mob_verify_demo_hint">一键登录 极速验证</string>
+
+	<!-- 认证成功页 -->
+	<string name="mob_verify_demo_success_title_sms">登录/注册</string>
+	<string name="mob_verify_demo_success_title_one_key_login">一键登录</string>
+	<string name="mob_verify_demo_success_complete">认证成功</string>
+	<string name="mob_verify_demo_success_hint">跳转到登录后的首页</string>
+	<string name="mob_verify_demo_success_to_homepage">返回首页</string>
 </resources>

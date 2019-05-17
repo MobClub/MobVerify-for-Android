@@ -1,9 +1,13 @@
 -ignorewarnings
+-keepattributes SourceFile,LineNumberTable,Exceptions,InnerClasses,EnclosingMethod,Signature,*Annotation*
 # for MobVerify/MobVerifyGUI/SMSSDK
 -keep class com.mob.**{*;}
 -keep class cn.smssdk.**{*;}
 # for CTCC
--keep class cn.com.chinatelecom.gateway.lib.** { *; }
+#手机号验证独立包的混淆规则
+#-keep class cn.com.chinatelecom.gateway.lib.** { *; }
+#新版合并包的混淆规则
+-keep class cn.com.chinatelecom.account.api.**{*;}
 # for CUCC
 -keep class com.unicom.xiaowo.verify.** { *; }
 # for CMCC
